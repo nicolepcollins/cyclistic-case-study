@@ -1,0 +1,242 @@
+---
+title: "Cyclistic Bike Share Analysis"
+author: "Nicole Collins"
+date: "2025-05-06"
+output:
+  html_document:
+    toc: true
+    toc_float: true 
+    toc_depth: 3    
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+![](cyclistic_logo.png)
+
+## Introduction
+### Understanding Cyclistic Ridership
+
+This report delves into the usage patterns of the Cyclistic bike-share program, comparing the behavior of annual members and casual riders. By analyzing trip data from the first quarter of 2019 and 2020, this study aims to uncover key differences in how these user groups interact with the service. 
+
+The primary focus is on **ride duration**, a critical metric for understanding user needs and optimizing service offering. Identifying distinct usage patterns will provide valuable insights for targeted marketing strategies and operational improvements. 
+
+## The Data
+### Acquisition and Preparation
+
+The data for this analysis comes from Divvy trip data for Q1 2019 and Q1 2020, publicly available under the [Divvy Data License Agreement](https://divvybikes.com/data-license-agreement), provided by Motivate International Inc.   
+
+The data was imported using the `read_csv()` function from the `tidyverse` package.
+
+```{r setting up environment}
+# Load essential libraries for data manipulation and visualization
+library(tidyverse)
+library(conflicted)
+conflict_prefer("filter", "dplyr")
+conflict_prefer("lag", "dplyr")
+
+# Load the datasets
+q1_2019 <- read_csv("Divvy_Trips_2019_Q1.csv")
+q1_2020 <- read_csv("Divvy_Trips_2020_Q1.csv")
+```
+
+## Data Cleaning and Transformation
+
+To ensure a robust and consistent analysis, the raw data underwent several crucial cleaning and transformation steps:
+
+* **Column Standardization**: Renamed columns in the 2019 dataset to align with the 2020 data structure, anticipating future data consistency.
+
+* **Data Type Conversion**: Ensured ride_length was in a numeric format for calculations and converted ride_id and rideable_type to character for proper merging.
+
+* **Data Integration**: Combined the 2019 and 2020 datasets into a unified all_trips dataframe using bind_rows().
+
+* **Irrelevant Data Removal**: Excluded columns not relevant to the analysis (latitude, longitude, birth year, gender, and the redundant tripduration from the 2019 data).
+
+* **Date Feature Engineering**: Created new columns for date, month, day, year, and day_of_week to enable temporal analysis.
+
+* **Ride Duration Calculation**: Computed a consistent ride_length in seconds for all trips using the difference between ended_at and started_at.
+
+* **Outlier and Error Handling**: Removed trips with negative ride_length values and those originating from the "HQ QR" station, likely representing data anomalies or quality checks rather than user rides.
+
+The R code below details these data wrangling procedures:
+
+```{r data wrangling}
+# Standardize column names for consistency with the 2020 dataset
+q1_2019 <- rename(q1_2019,
+                  ride_id = trip_id,
+                  rideable_type = bikeid,
+                  started_at = start_time,
+                  ended_at = end_time,
+                  start_station_name = from_station_name,
+                  start_station_id = from_station_id,
+                  end_station_name = to_station_name,
+                  end_station_id = to_station_id,
+                  member_casual = usertype)
+
+# Inspect the structure of the initial dataframes
+str(q1_2019)
+str(q1_2020)
+
+# Convert ride_length to numeric (handling potential variations)
+q1_2019 <- mutate(q1_2019, ride_length = as.numeric(hms::parse_hms(ride_length)))
+q1_2020 <- mutate(q1_2020, ride_length = as.numeric(ride_length))
+
+# Ensure ride_id and rideable_type are character for consistent stacking
+q1_2019 <- mutate(q1_2019, ride_id = as.character(ride_id),
+                  rideable_type = as.character(rideable_type))
+
+# Combine datasets from both quarters
+all_trips <- bind_rows(q1_2019, q1_2020)
+
+# Select relevant columns and remove redundant or inconsistent fields
+all_trips <- select(all_trips, -c(start_lat, start_lng, end_lat, end_lng, birthyear, gender, "tripduration"))
+
+# --- Feature Engineering and Data Cleaning ---
+
+# Convert started_at to Date for extracting temporal features
+all_trips$date <- as.Date(all_trips$started_at)
+all_trips$month <- format(all_trips$date, "%m")
+all_trips$day <- format(all_trips$date, "%d")
+all_trips$year <- format(all_trips$date, "%Y")
+all_trips$day_of_week <- format(all_trips$date, "%A")
+
+# Calculate ride length in seconds
+all_trips$ride_length <- difftime(all_trips$ended_at, all_trips$started_at, units = "secs")
+all_trips$ride_length <- as.numeric(all_trips$ride_length) # Ensure it's numeric
+
+# Standardize rider type labels
+table(all_trips$member_casual) # Inspect initial distribution
+all_trips <- mutate(all_trips,
+                  member_casual = recode(member_casual,
+                                           "Subscriber" = "member",
+                                           "Customer" = "casual"))
+table(all_trips$member_casual) # Verify changes
+
+# Remove invalid ride data (negative duration or HQ QR station)
+all_trips_v2 <- filter(all_trips, !(start_station_name == "HQ QR" | ride_length < 0))
+
+# --- Data Exploration (Optional but good for context) ---
+# glimpse(all_trips_v2)
+# summary(all_trips_v2)
+```
+
+## Exploratory Data Analysis: Ride Duration Patterns
+
+This section examines the distribution of ride lengths (in seconds) for all cleaned trips to understand typical usage patterns. Key measures of central tendency and spread are presented below.
+
+The average ride duration across all riders was approximately `r round(mean(all_trips_v2$ride_length, na.rm = TRUE) / 60, 1)` minutes (or `r round(mean(all_trips_v2$ride_length, na.rm = TRUE), 0)` seconds), suggesting the typical ride lasts around this time. The median ride duration, which is less sensitive to outliers, was about `r round(median(all_trips_v2$ride_length, na.rm = TRUE) / 60, 1)` minutes (or `r round(median(all_trips_v2$ride_length, na.rm = TRUE), 0)` seconds), highlighting a potential skew in the distribution due to longer rides.
+
+The range of ride lengths was considerable, from a minimum of `r round(min(all_trips_v2$ride_length, na.rm = TRUE) / 60, 1)` minutes to a maximum of about `r round(max(all_trips_v2$ride_length, na.rm = TRUE) / 3600, 1)` hours (or `r round(max(all_trips_v2$ride_length, na.rm = TRUE), 0)` seconds). This wide variability suggests diverse usage scenarios.
+
+A detailed statistical summary of ride lengths is presented below:
+
+```{r descriptive_summary}
+summary(all_trips_v2$ride_length)
+```
+
+**Comparing Ride Duration by Rider Type**
+
+To understand the distinct usage patterns of members and casual riders, the following table compares key ride duration statistics for each group:
+
+| Rider Type | Average Ride (minutes) | Median Ride (minutes) | Max Ride (hours) | Min Ride (minutes) |
+|------------|------------------------|-----------------------|------------------|--------------------|
+| Member     | `r round(aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = mean)[2, 2] / 60, 1)` | `r round(aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = median)[2, 2] / 60, 1)` | `r round(aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = max)[2, 2] / 3600, 1)` | `r round(aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = min)[2, 2] / 60, 1)` |
+| Casual     | `r round(aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = mean)[1, 2] / 60, 1)` | `r round(aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = median)[1, 2] / 60, 1)` | `r round(aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = max)[1, 2] / 3600, 1)` | `r round(aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = min)[1, 2] / 60, 1)` |
+
+```{r descriptive_by_type}
+# Descriptive statistics by rider type (in seconds)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = summary)
+
+# Average ride time by rider type and day of the week (initial - unordered)
+average_ride_by_day_unordered <- aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = mean)
+# print(average_ride_by_day_unordered) # Keep this commented out in the final report
+
+# Order the days of the week for meaningful analysis and visualization
+all_trips_v2$day_of_week <- ordered(all_trips_v2$day_of_week, levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+
+# Average ride time by rider type and day of the week (ordered)
+average_ride_by_day <- aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = mean)
+# print(average_ride_by_day) # Keep this commented out
+
+# Summarize ridership data by type and weekday for visualization
+rider_weekday_summary <- all_trips_v2 %>%
+  mutate(weekday = wday(started_at, label = TRUE)) %>% # creates weekday field
+  group_by(member_casual, weekday) %>% # groups by usertype and weekday
+  summarise(number_of_rides = n(), # calculates the number of rides
+            average_duration = mean(ride_length)) %>% # calculates the average duration
+  arrange(member_casual, weekday) # sorts
+```
+
+## Visualizing Rider Behavior
+
+The following visualizations illustrate the differences in riding patterns between members and casual riders across the week, focusing on the number of rides and the average ride duration.
+
+```{r visualization}
+# Visualize the number of rides by rider type and weekday
+library(scales) # Load the scales package
+
+ggplot(rider_weekday_summary, aes(x = weekday, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("casual" = "#f0fa65", "member" = "#3b92a5")) +
+  labs(title = "Number of Rides by Rider Type and Weekday",
+       x = "Day of Week",
+       y = "Number of Rides",
+       fill = "Rider Type") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5)) + # Center the title
+  scale_y_continuous(labels = comma) # Format y-axis labels with commas
+```
+
+```{r visualize_duration_by_type}
+# Visualize the average ride duration by rider type and weekday
+ggplot(rider_weekday_summary, aes(x = weekday, y = average_duration / 60, fill = member_casual)) + # Display in minutes for better readability
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("casual" = "#f0fa65", "member" = "#3b92a5")) +
+  labs(title = "Average Ride Duration (Minutes) by Rider Type and Weekday",
+       x = "Day of Week",
+       y = "Average Ride Duration (Minutes)",
+       fill = "Rider Type") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5)) # Center the title
+```
+
+## Key Findings and Implications
+
+The analysis reveals significant differences in how annual members and casual riders utilize the Cyclistic bike-share program: 
+
+* **Ride Duration**: Casual riders consistently exhibit longer average ride durations compared to members, particularly on weekends. This suggests that casual riders may be using the service more for leisure activities or longer trips. 
+
+* **Weekday vs. Weekend Usage**: Members show a more consistent number of rides throughout the week, likely indicative of commuting or regular daily activities. In contrast, casual ridership peaks on weekends, aligning with potential leisure use. 
+
+These findings have several implications for Cyclistic's strategies: 
+
+* **Targeted Marketing**: Marketing campaigns can be tailored to each user group. For casual riders, highlighting weekend leisure opportunities and longer ride benefits could be effective. For members, emphasizing the convenience for weekday commutes and offering incentives for off-peak usage might be beneficial. 
+
+* **Operational Optimization**: Understanding the peak usage times for each group can inform decisions regarding bike availability and station management. The higher weekend usage by casual riders may necessitate increased bike availability in popular leisure areas during those times. 
+
+## Data Export
+#### (for further analysis or reporting)
+
+```{r exporting}
+# Aggregate data: average ride length by rider type and day of the week
+counts <- aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = mean)
+
+# Rename columns for clarity in the exported CSV
+names(counts) <- c("Member_Casual", "Day_of_Week", "Average_Ride_Length_Seconds")
+
+# Define a platform-independent file path
+output_file <- file.path("~", "Documents", "avg_ride_length.csv")
+
+# Export the aggregated data to a CSV file, without row names
+write.csv(counts, file = output_file, row.names = FALSE)
+
+# Provide user feedback on the successful export
+cat("Aggregated data successfully exported to:", output_file, "\n")
+
+# Optional: Display the first few rows of the exported data for verification
+head(counts)
+```
+
+
