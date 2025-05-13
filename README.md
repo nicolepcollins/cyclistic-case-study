@@ -45,5 +45,5 @@ To analyze the Cyclistic bike-share dataset and provide actionable insights to h
 ---
 
 ## 📬 Contact
-- 📧 [Your Email](nicolepcollins14@gmail.com)
-- 💼 [Your LinkedIn](https://www.linkedin.com/in/nicole-collins-345b10166/)
+- 📧 [My Email](nicolepcollins14@gmail.com)
+- 💼 [My LinkedIn](https://www.linkedin.com/in/nicole-collins-345b10166/)
