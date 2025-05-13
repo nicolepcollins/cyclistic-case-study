@@ -20,6 +20,12 @@ To analyze the Cyclistic bike-share dataset and provide actionable insights to h
 
 ---
 
+## 📄 View the Report
+
+🔗 [Click here to view the full HTML report](https://nicolepcollins.github.io/cyclistic-case-study/)
+
+---
+
 ## 📈 Tableau Dashboard
 
 🔗 [View the interactive dashboard on Tableau Public](https://public.tableau.com/views/CyclisticQ120192020RiderBehaviorAnalysis/CyclisticQ12019-2020RiderBehaviorAnalysis?:language=en-US&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link)
