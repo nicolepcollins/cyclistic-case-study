@@ -40,10 +40,10 @@ To analyze the Cyclistic bike-share dataset and provide actionable insights to h
 - These trends support the idea that casual riders are more likely **tourists or recreational users**, while annual members are typically **local, routine commuters**.
 - To support the business goal of **converting casual riders into annual members**, it's recommended to:
   - Conduct further analysis on Q2 data (warmer months) to better identify local casual riders who may be open to membership.
-  - **Target marketing efforts**—including print and social media—near high-traffic lakeshore stations to attract potential converts among recreational riders.
+  - **Target marketing efforts**:including print and social media, near high-traffic lakeshore stations to attract potential converts among recreational riders.
 
 ---
 
 ## 📬 Contact
 - 📧 [My Email](nicolepcollins14@gmail.com)
-- 💼 [My LinkedIn](https://www.linkedin.com/in/nicole-collins-345b10166/)
+- 💼 [My LinkedIn](https://www.linkedin.com/in/nicole-collins-data-analyst/)
